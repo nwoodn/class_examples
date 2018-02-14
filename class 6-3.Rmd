@@ -4,9 +4,19 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-library(statisticalModeling)
-library(mosaicModel) # newer version of statisticalModeling with better functions
+# install.packages("tidyverse")
+# install.packages("mosaic")
+# install.packages("ggplot2")
+# install.packages("dplyr")
+# install.packages("broom")
+# install.packages("lattice")
+# install.packages("gridExtra")
+# install.packages("grid")
+# install.packages("devtools")
+# devtools::install_github("ProjectMOSAIC/mosaicModel")
+# install.packages("pryr")
+
+#library(pryr) # used for debugging function evaluation
 library(tidyverse)
 library(mosaic)
 library(ggplot2)
@@ -15,6 +25,10 @@ library(broom)
 library(lattice)
 library(gridExtra)
 library(grid)
+library(mosaicModel) # newer version of statisticalModeling with better functions
+
+
+
 ```
 
 #Load ads data
@@ -23,6 +37,38 @@ library(grid)
 ads_sales <- as_tibble(read.csv("Advertising.csv"))
 
 ```
+# Simulating time I get to school
+
+```{r}
+commute_monte_carlo <- function(){
+  wakeup <- 700 + rnorm(1, 10, 2)
+  breakfast <- 10 + runif(1, -5, 5 )
+  commute <- 20 + runif(1, 0, 10 )
+  time_to_get_to_school <- wakeup + breakfast + commute
+  
+  #time_to_get_to_school <-  ...
+  return(time_to_get_to_school)
+}
+
+simulate_1000_times <- do(1000)*commute_monte_carlo()
+hist(simulate_1000_times$commute_monte_carlo)
+
+
+profit_monte_carlo <- function(){
+  # the price of ads fluctuates with the market
+  # we model these price fluctuations with a random value
+  ad_cost <- 9 + runif(1, -2, 10)
+  number_of_ads <- 2
+  expected_sales_per_ad_spending <- 1.04*number_of_ads
+  
+  profit <- expected_sales_per_ad_spending - (ad_cost*number_of_ads)
+  return(profit)
+}
+
+simulate_1000_times <- do(1000)*profit_monte_carlo()
+hist(simulate_1000_times$profit_monte_carlo)
+```
+
 # Simulating weight gain
 
 
@@ -55,36 +101,60 @@ model <- lm ( sales ~ TV * radio + newspaper, data=ads_sales)
 first_sales_model <- mod_fun(model)
 
 choice_TV<-10
-x<-first_sales_model(TV=choice_TV, 
+x<-first_sales_model(TV=20, 
                     radio=0, 
                     newspaper=0)
 x
 # refactored:
-simulate_decision <- function(choice_TV_hi, choice_radio, choice_newspaper)
+simulate_decision_f_as_arg <- function(z, choice_radio, choice_newspaper, model_func)
 {
-  print(choice_TV_hi)
-  hi <- choice_TV_hi
-  force(hi)
-  browser()
-  predicted_sales <-first_sales_model(TV=hi, 
-                    radio=0, 
-                    newspaper=0) # %>% select(mod_output)
-  return(predicted_sales)
+  force(z)
+ browser()
+ model_func(z, 
+                    0, 
+                    0)
 }
 
+simulate_decision <- function(z, choice_radio, choice_newspaper)
+{
+ eval(substitute(first_sales_model(TV=z, 
+                    radio=0, 
+                    newspaper=0)))
+}
 
+#remaining: try all the functions that for evaluation, parse, etc
+# try to edit mosaicModel to evaluate arguments also in the parent's frame?
+# so add an eval call that looks up the env chain? why doesn't it do it by default?
+
+not_buggy_function <- function(TV, radio, newspaper){
+  TV+radio+newspaper
+}
+
+simulate_decision_not_buggy<- function(z, choice_radio, choice_newspaper)
+{
+ not_buggy_function(z, 
+                    0, 
+                    0)
+}
+
+simulate_decision_not_buggy(0,20,40)
+mod_fun
+
+simulate_decision_f_as_arg <- function(z, choice_radio, choice_newspaper, model_func)
+{
+ model_func(0, substitute(choice_radio), 0)
+}
+simulate_decision_f_as_arg(0,20,40,first_sales_model)
 # optimize the choice - find the value of choice that gives highest function value
 # ie find choice such that f(choice) is highest, for some values of choice
-simulate_decision(seq(0,200,length=200),20,40)
+x<- simulate_decision(0,20,40)
+x
 
 # the price of ads fluctuates with the market
 # we model these price fluctuations as a random variable
-ad_price <- rnorm(n=1, mean=3, sd=.02)
-revenue_per_sale <- 1000
 
 
-
-# refactor to make revenue_per_sale vary
+# change to make revenue_per_sale vary
 
 
 # plot by revenue_per_sale
@@ -97,7 +167,7 @@ revenue_per_sale <- 1000
 
 ```{r}
 ?resample
-fruit <- c("apple", "kiwi", "lemon")
+fruit <- c("apple", "kiwi", "lemon", "orange", "pomegranate")
 rep(1/length(fruit), times=length(fruit))
 ```
 
@@ -106,6 +176,7 @@ rep(1/length(fruit), times=length(fruit))
 You can also embed plots, for example:
 
 ```{r pressure, echo=FALSE}
+fruit
 resample(fruit)
 resample(fruit)
 resample(fruit)
@@ -122,7 +193,6 @@ Typically you should use 15,000 resamples to make a sampling distribution. With 
 # let's use the ads dataset from last class
 # let's make a confidence interval for the effect size of TV
 
-
 approx_sampling_distribution_for_TV_effect <- tribble( ~slope)
 
 resample1 <- resample(ads_sales)
@@ -131,11 +201,13 @@ slope <- mod_effect(model, ~ TV) %>% select(slope)
 approx_sampling_distribution_for_TV_effect <- 
   bind_rows(approx_sampling_distribution_for_TV_effect,slope)
 
+
+# how do we interpret effect size with multiple explanatory variables / interaction terms in the model
 slope
 approx_sampling_distribution_for_TV_effect
 
 resample2 <- resample(ads_sales)
-model <- lm ( sales ~ TV + radio + newspaper, data=resample1)
+model <- lm ( sales ~ TV + radio + newspaper, data=resample2)
 slope <- mod_effect(model, ~ TV) %>% select(slope)
 approx_sampling_distribution_for_TV_effect <- 
   bind_rows(approx_sampling_distribution_for_TV_effect,slope)
@@ -149,6 +221,11 @@ approx_sampling_distribution_for_TV_effect
 
 ```{r}
 model <- lm ( sales ~ TV + radio + newspaper, data=ads_sales)
+sales_mod_ensemble <- mod_ensemble(model, nreps = 2) 
+approx_sampling_distribution_w_mod_ensemble <- 
+  mod_effect(sales_mod_ensemble, ~ TV)
+
+
 
 sales_mod_ensemble <- mod_ensemble(model, nreps = 100) 
 approx_sampling_distribution <- 
@@ -164,7 +241,12 @@ cover95 <- coverage(0.95)
 # the strange syntax is to let you see interaction effects
 #
 approx_sampling_distribution %>%
-  df_stats(slope ~ radio, cover95)
+  df_stats(~ TV, cover95)
+
+# you can also parametric formulas
+lower_ci =  mean (approx_sampling_distribution$slope) - 1.96*sd(approx_sampling_distribution)
+upper_ci =  mean (approx_sampling_distribution$slope) + 1.96*sd(approx_sampling_distribution)
+
 
 #nice to have: compare to the theoretical CI
 approx_sampling_distribution
@@ -191,5 +273,19 @@ tidy(summary(model))
 # Let's visualize the approx. sampling distribution for effect size
 
 ```{r}
+hist(approx_sampling_distribution$slope)
+```
+# Let's simulate some random linear data
+
+```{r}
+actual_slope <- .6
+actual_intercept <- 10
+
+runif(3, 0, 1)
+rnorm(3)
+rnorm(3, 0, 1)
+# for (nrep in 1:10000 )
+random_dataset <-actual_intercept + actual_slope * runif(100, 0, 20)
+
 hist(approx_sampling_distribution$slope)
 ```
