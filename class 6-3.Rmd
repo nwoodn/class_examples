@@ -102,13 +102,14 @@ first_sales_model <- mod_fun(model)
 # the amount of sales, but we will reframe and simulate profits soon
 simulate_decision <- function(choice_TV, choice_radio, choice_newspaper)
 {
- substitute(
+  #browser()
+ eval(substitute(
    first_sales_model(TV=choice_TV, 
                     radio=choice_radio, 
-                    newspaper=choice_newspaper))
+                    newspaper=choice_newspaper)))
 }
 
-eval(simulate_decision(0,20,40))
+x<-simulate_decision(10,20,40)
 
 # optimize the choice - find the value of choice that gives highest function value
 # ie find choice such that f(choice) is highest, for some values of choice
@@ -116,20 +117,24 @@ eval(simulate_decision(0,20,40))
 # optim expects a single number so we need to get that out of the 
 # tibble in the model_output column.
 # We write simple wrapper function to convert to the interface optim wants
+# note: I think this doesn't work b/c
+#   substitute only looks one level up
+#   e.g. https://github.com/hadley/lazyeval/blob/master/vignettes/lazyeval.Rmd
+#   "substitute() only looks one level up, so you lose the original label if the function isn't called directly:"
+
 sales_wrapper <- function(par){
-  #eval(substitute(
-  x<-  simulate_decision(par[1], par[2], par[3])$model_output
+  force(par)
+  x <- simulate_decision(par[1], par[2], par[3])
+ # x <- eval(x)
   #))
   browser()
-  x
-}
-fr <- function(x) {   ## Rosenbrock Banana function
-    x1 <- x[1]
-    x2 <- x[2]
-    100 * (x2 - x1 * x1)^2 + (1 - x1)^2
+  x$model_output
 }
 
-optim(par=c(0,0,0), sales_wrapper, gr=NULL, method="L-BFGS-B",
+
+
+
+optim(par=0:2, simulate_decision, gr=NULL, method="L-BFGS-B",
       lower=rep(0, 3), upper=rep(200,3))
 
 
@@ -145,6 +150,18 @@ optim(par=c(0,0,0), sales_wrapper, gr=NULL, method="L-BFGS-B",
 
 ```
 
+```{r}
+fr <- function(x) {   ## Rosenbrock Banana function
+    browser()
+    x1 <- x[1]
+    x2 <- x[2]
+    100 * (x2 - x1 * x1)^2 + (1 - x1)^2
+}
+
+y <- optim(par=c(0,0), fr, gr=NULL, method="L-BFGS-B",
+      lower=rep(0, 3), upper=rep(200,3))
+y
+```
 
 ## Resample function
 
