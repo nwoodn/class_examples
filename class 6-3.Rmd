@@ -95,60 +95,43 @@ hist(simulate_1000_times$profit_monte_carlo)
 model <- lm ( sales ~ TV * radio + newspaper, data=ads_sales)
 
 # let's simulate a decision
-# todo: make slides for this stuff to give them example to work from
-
-
 first_sales_model <- mod_fun(model)
 
-choice_TV<-10
-x<-first_sales_model(TV=20, 
-                    radio=0, 
-                    newspaper=0)
-x
-# refactored:
-simulate_decision_f_as_arg <- function(z, choice_radio, choice_newspaper, model_func)
+# the function will return the outcome
+# we'll start by simulating the decision with the outcome as
+# the amount of sales, but we will reframe and simulate profits soon
+simulate_decision <- function(choice_TV, choice_radio, choice_newspaper)
 {
-  force(z)
- browser()
- model_func(z, 
-                    0, 
-                    0)
+ substitute(
+   first_sales_model(TV=choice_TV, 
+                    radio=choice_radio, 
+                    newspaper=choice_newspaper))
 }
 
-simulate_decision <- function(z, choice_radio, choice_newspaper)
-{
- eval(substitute(first_sales_model(TV=z, 
-                    radio=0, 
-                    newspaper=0)))
-}
+eval(simulate_decision(0,20,40))
 
-#remaining: try all the functions that for evaluation, parse, etc
-# try to edit mosaicModel to evaluate arguments also in the parent's frame?
-# so add an eval call that looks up the env chain? why doesn't it do it by default?
-
-not_buggy_function <- function(TV, radio, newspaper){
-  TV+radio+newspaper
-}
-
-simulate_decision_not_buggy<- function(z, choice_radio, choice_newspaper)
-{
- not_buggy_function(z, 
-                    0, 
-                    0)
-}
-
-simulate_decision_not_buggy(0,20,40)
-mod_fun
-
-simulate_decision_f_as_arg <- function(z, choice_radio, choice_newspaper, model_func)
-{
- model_func(0, substitute(choice_radio), 0)
-}
-simulate_decision_f_as_arg(0,20,40,first_sales_model)
 # optimize the choice - find the value of choice that gives highest function value
 # ie find choice such that f(choice) is highest, for some values of choice
-x<- simulate_decision(0,20,40)
-x
+
+# optim expects a single number so we need to get that out of the 
+# tibble in the model_output column.
+# We write simple wrapper function to convert to the interface optim wants
+sales_wrapper <- function(par){
+  #eval(substitute(
+  x<-  simulate_decision(par[1], par[2], par[3])$model_output
+  #))
+  browser()
+  x
+}
+fr <- function(x) {   ## Rosenbrock Banana function
+    x1 <- x[1]
+    x2 <- x[2]
+    100 * (x2 - x1 * x1)^2 + (1 - x1)^2
+}
+
+optim(par=c(0,0,0), sales_wrapper, gr=NULL, method="L-BFGS-B",
+      lower=rep(0, 3), upper=rep(200,3))
+
 
 # the price of ads fluctuates with the market
 # we model these price fluctuations as a random variable
