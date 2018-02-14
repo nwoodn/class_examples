@@ -1,0 +1,199 @@
+---
+title: "Class 6-3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(statisticalModeling)
+library(mosaicModel) # newer version of statisticalModeling with better functions
+library(tidyverse)
+library(mosaic)
+library(ggplot2)
+library(dplyr)
+library(broom)
+library(lattice)
+library(gridExtra)
+library(grid)
+```
+
+#Load ads data
+
+```{r}
+ads_sales <- as_tibble(read.csv("Advertising.csv"))
+
+```
+# Simulating weight gain
+
+
+# Simulating demand for housing in Seattle
+
+```{r}
+# population of seattle
+# population of seattle that rents
+
+
+# now, if we were economists, we could model price as function of demand
+#   then we could predict rental/housing prices
+
+
+# now the mayor announces a new plan to build 1,000 affordable units per month
+
+
+```
+
+# Simulating Ads decision
+
+
+```{r}
+model <- lm ( sales ~ TV * radio + newspaper, data=ads_sales)
+
+# let's simulate a decision
+# todo: make slides for this stuff to give them example to work from
+
+
+first_sales_model <- mod_fun(model)
+
+wrapper <- function(params){
+  first_sales_model(TV=params[1], radio=params[2], newspaper=params[3])
+}
+
+first_sales_model(TV=0,newspaper=0,radio=0)
+first_sales_model(0,0,0)
+happy <- 0:2
+wrapper(happy)
+# optimize - find the value of x that gives highest function value
+# ie find x such that f(x) is highest, for some values of x
+
+optim(par=c(0,0,0), fn=wrapper, gr=NULL,method="L-BFGS-B", lower=c(0,0,0), upper=c(200,200,200))
+
+
+
+# refactored:
+simulate_decision <- function(
+  choice_TV, choice_radio, choice_newspaper, 
+  sales_model_fun)
+{
+  predicted_sales <- 
+    sales_model_fun(choice_TV, 
+                    choice_radio, 
+                    choice_newspaper)
+  predicted_sales
+}
+
+# the price of ads fluctuates with the market
+# we model these price fluctuations as a random variable
+ad_price <- rnorm(n=1, mean=3, sd=.02)
+revenue_per_sale <- 1000
+
+
+
+# refactor to make revenue_per_sale vary
+
+
+# plot by revenue_per_sale
+
+
+```
+
+
+## Resample function
+
+```{r}
+?resample
+fruit <- c("apple", "kiwi", "lemon")
+rep(1/length(fruit), times=length(fruit))
+```
+
+## Let's take some resamples from the fruit
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+resample(fruit)
+resample(fruit)
+resample(fruit)
+resample(fruit)
+
+```
+We see that we don't always get the same sample. This is because resample is taking any row with equal probability, then doing it again. It can choose a row many times. If this makes you nervous, fear not, as the dataset size increases, the chance that you choose a row over and over (too much) is quite small.
+
+Typically you should use 15,000 resamples to make a sampling distribution. With modern computers this is often quite feasible. (For big data, you can take a sample of your data 15,000 times.)
+
+# "Bootstrapping" using 3 resamples as an example
+
+```{r}
+# let's use the ads dataset from last class
+# let's make a confidence interval for the effect size of TV
+
+
+approx_sampling_distribution_for_TV_effect <- tribble( ~slope)
+
+resample1 <- resample(ads_sales)
+model <- lm ( sales ~ TV + radio + newspaper, data=resample1)
+slope <- mod_effect(model, ~ TV) %>% select(slope)
+approx_sampling_distribution_for_TV_effect <- 
+  bind_rows(approx_sampling_distribution_for_TV_effect,slope)
+
+slope
+approx_sampling_distribution_for_TV_effect
+
+resample2 <- resample(ads_sales)
+model <- lm ( sales ~ TV + radio + newspaper, data=resample1)
+slope <- mod_effect(model, ~ TV) %>% select(slope)
+approx_sampling_distribution_for_TV_effect <- 
+  bind_rows(approx_sampling_distribution_for_TV_effect,slope)
+
+slope
+approx_sampling_distribution_for_TV_effect
+
+# 14,998 more times ...
+```
+# mod_ensemble - makes <nreps> of models for you
+
+```{r}
+model <- lm ( sales ~ TV + radio + newspaper, data=ads_sales)
+
+sales_mod_ensemble <- mod_ensemble(model, nreps = 100) 
+approx_sampling_distribution <- 
+  mod_effect(sales_mod_ensemble, ~ TV)
+
+approx_sampling_distribution
+hist(approx_sampling_distribution$slope)
+
+# helper function that computes the coverage interval / confidence interval at the desired level
+cover95 <- coverage(0.95)
+
+# get confidence interval
+# the strange syntax is to let you see interaction effects
+#
+approx_sampling_distribution %>%
+  df_stats(slope ~ radio, cover95)
+
+#nice to have: compare to the theoretical CI
+approx_sampling_distribution
+ 
+
+```
+
+
+# Bootstrapping with 15k resamples
+
+```{r}
+set.seed(42) #reproducibility - the answer to everything
+
+# bootstrapping with 15,000 resamples
+sales_mod_ensemble <- mod_ensemble(model, nreps = 15000) 
+approx_sampling_distribution <- 
+  mod_effect(sales_mod_ensemble, ~ TV)
+
+tidy(summary(model))
+#pro-tip: keep this separate or load an R data file to save yourself time
+#alternative: built-in coffee breaks for your scripts
+
+```
+# Let's visualize the approx. sampling distribution for effect size
+
+```{r}
+hist(approx_sampling_distribution$slope)
+```
