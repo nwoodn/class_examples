@@ -100,6 +100,10 @@ first_sales_model <- mod_fun(model)
 # the function will return the outcome
 # we'll start by simulating the decision with the outcome as
 # the amount of sales, but we will reframe and simulate profits soon
+
+# ****!
+# this eval(substitute( )) hack to fix issues with argument evaluation
+# with mod_fun only works one call level deep, unfortunately
 simulate_decision <- function(choice_TV, choice_radio, choice_newspaper)
 {
   #browser()
@@ -123,19 +127,27 @@ x<-simulate_decision(10,20,40)
 #   "substitute() only looks one level up, so you lose the original label if the function isn't called directly:"
 
 sales_wrapper <- function(par){
-  force(par)
-  x <- simulate_decision(par[1], par[2], par[3])
- # x <- eval(x)
-  #))
-  browser()
-  x$model_output
+  
+  tv <- par[1]
+  radio <- par[2]
+  newsp <- par[3]
+  if(tv+radio+newsp > 500 || tv+radio+newsp < 0)#budget
+  {
+    return(-1)
+  } else {
+   s <- eval(substitute(
+   first_sales_model(TV=tv, 
+                    radio=radio, 
+                    newspaper=newsp)))
+ 
+   s$model_output
+   }
 }
 
 
 
 
-optim(par=0:2, simulate_decision, gr=NULL, method="L-BFGS-B",
-      lower=rep(0, 3), upper=rep(200,3))
+optim(par=c(5,5,5), sales_wrapper, gr=NULL, method="L-BFGS-B")
 
 
 # the price of ads fluctuates with the market
