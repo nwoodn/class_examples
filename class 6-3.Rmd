@@ -97,7 +97,7 @@ model <- lm ( sales ~ TV * radio + newspaper, data=ads_sales)
 # let's simulate a decision
 first_sales_model <- mod_fun(model)
 
-# the function will return the outcome
+# the function below will return the outcome
 # we'll start by simulating the decision with the outcome as
 # the amount of sales, but we will reframe and simulate profits soon
 
@@ -114,9 +114,6 @@ simulate_decision <- function(choice_TV, choice_radio, choice_newspaper)
 }
 
 x<-simulate_decision(10,20,40)
-
-# optimize the choice - find the value of choice that gives highest function value
-# ie find choice such that f(choice) is highest, for some values of choice
 
 # optim expects a single number so we need to get that out of the 
 # tibble in the model_output column.
@@ -147,7 +144,11 @@ sales_wrapper <- function(par){
 
 
 
-optim(par=c(5,5,5), sales_wrapper, gr=NULL, method="L-BFGS-B")
+# optimize the choice - find the value of choice that gives highest function value
+# ie find choice such that f(choice) is highest, for some values of choice
+# ie 
+optim(par=c(5,5,5), sales_wrapper, gr=NULL, method="L-BFGS-B",
+      control = list(fnscale = -1))
 
 
 # the price of ads fluctuates with the market
@@ -164,7 +165,6 @@ optim(par=c(5,5,5), sales_wrapper, gr=NULL, method="L-BFGS-B")
 
 ```{r}
 fr <- function(x) {   ## Rosenbrock Banana function
-    browser()
     x1 <- x[1]
     x2 <- x[2]
     100 * (x2 - x1 * x1)^2 + (1 - x1)^2
@@ -172,6 +172,16 @@ fr <- function(x) {   ## Rosenbrock Banana function
 
 y <- optim(par=c(0,0), fr, gr=NULL, method="L-BFGS-B",
       lower=rep(0, 3), upper=rep(200,3))
+y
+
+line <- function(x) {   ## Rosenbrock Banana function
+    x1 <- x[1]
+    x2 <- x[2]
+    100 * x2 + x1
+}
+
+y <- optim(par=c(50,50), line, gr=NULL, method="L-BFGS-B",
+      lower=rep(0, 3), upper=rep(200,3), control = list(fnscale = -1))
 y
 ```
 
