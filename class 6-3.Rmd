@@ -37,7 +37,9 @@ library(mosaicModel) # newer version of statisticalModeling with better function
 ads_sales <- as_tibble(read.csv("Advertising.csv"))
 
 ```
-# Simulating time I get to school
+# Monte carlo simulation example
+
+Simulating the time I will get to school. See slides 6.3 (Weds Week 6) for more on monte carlo.
 
 ```{r}
 commute_monte_carlo <- function(){
@@ -53,43 +55,25 @@ commute_monte_carlo <- function(){
 simulate_1000_times <- do(1000)*commute_monte_carlo()
 hist(simulate_1000_times$commute_monte_carlo)
 
+```
+# Monte carlo simulation: Profit from buying ads when ad price might vary
 
+```{r}
 profit_monte_carlo <- function(){
   # the price of ads fluctuates with the market
   # we model these price fluctuations with a random value
   ad_cost <- 9 + runif(1, -2, 10)
   number_of_ads <- 2
-  expected_sales_per_ad_spending <- 1.04*number_of_ads
+  expected_sales_per_ad <- 1.04*number_of_ads
   
-  profit <- expected_sales_per_ad_spending - (ad_cost*number_of_ads)
+  profit <- expected_sales_per_ad - (ad_cost*number_of_ads)
   return(profit)
 }
 
 simulate_1000_times <- do(1000)*profit_monte_carlo()
 hist(simulate_1000_times$profit_monte_carlo)
 ```
-
-# Simulating weight gain
-
-
-# Simulating demand for housing in Seattle
-
-```{r}
-# population of seattle
-# population of seattle that rents
-
-
-# now, if we were economists, we could model price as function of demand
-#   then we could predict rental/housing prices
-
-
-# now the mayor announces a new plan to build 1,000 affordable units per month
-
-
-```
-
 # Simulating Ads decision
-
 
 ```{r}
 model <- lm ( sales ~ TV * radio + newspaper, data=ads_sales)
@@ -249,30 +233,78 @@ approx_sampling_distribution_w_mod_ensemble <-
 
 
 
-sales_mod_ensemble <- mod_ensemble(model, nreps = 100) 
+sales_mod_ensemble <- mod_ensemble(model, nreps = 10000) 
 approx_sampling_distribution <- 
   mod_effect(sales_mod_ensemble, ~ TV)
 
 approx_sampling_distribution
 hist(approx_sampling_distribution$slope)
 
+
+# BEGIN buggy
+# for some reason this is buggy, probably the library isn't mature
+
+# this syntax is preffered b/c it highlights that what you computed
+# might vary with different variables (the ~ TV)
+
 # helper function that computes the coverage interval / confidence interval at the desired level
-cover95 <- coverage(0.95)
+
+# cover95 <- coverage(0.95)
 
 # get confidence interval
 # the strange syntax is to let you see interaction effects
 #
-approx_sampling_distribution %>%
-  df_stats(~ TV, cover95)
+#approx_sampling_distribution %>%
+#  df_stats(~ TV, cover95)
 
-# you can also parametric formulas
-lower_ci =  mean (approx_sampling_distribution$slope) - 1.96*sd(approx_sampling_distribution)
-upper_ci =  mean (approx_sampling_distribution$slope) + 1.96*sd(approx_sampling_distribution)
+# END buggy
+
+# you can use empirical quantiles
+# for a 1-alpha confidence interval (here alpha = .05)
+# you do 
+confidence_interval_for <- function(actual_column, alpha){
+  lower <- alpha/2
+  upper <- 1 - (alpha/2)
+  quantile(actual_column, probs = c(lower, upper))
+}
+
+#these give same result
+quantile(approx_sampling_distribution$slope, probs = c(.025, .975))
+
+confidence_interval_for(approx_sampling_distribution$slope, .05)
+
+# you can also use parametric formulas
+lower_ci =  mean (approx_sampling_distribution$slope) - 1.96*sd(approx_sampling_distribution$slope)
+upper_ci =  mean (approx_sampling_distribution$slope) + 1.96*sd(approx_sampling_distribution$slope)
 
 
-#nice to have: compare to the theoretical CI
-approx_sampling_distribution
- 
+#compare to the theoretical CI
+confint(model, "TV")
+confidence_interval_for(approx_sampling_distribution$slope, .05)
+c(lower_ci, upper_ci )
+
+# the linear model's assumptions don't hold for this model
+# b/c if you look at the residuals, you see they don't look
+# gaussian distributed (you can also test the residuals for normality)
+# with this test
+data_with_residuals <- augment(model, ads_sales)
+shapiro.test(data_with_residuals$.resid)
+
+#how to tell what the p-value means for the shapiro wilkes test above
+# does p<alpha (eg .05) mean the data is not normal?
+#let's do a monte carlo simulation
+# generate some normal data test it, then compare to non-normal data
+shapiro.test(rnorm(100, mean = 5, sd = 3))
+shapiro.test(runif(100, min = 2, max = 4))
+
+# the p-value is much lower for the second one
+# (the not gaussian data one), so we can tell that p<alpha means
+# rejecting the null hypothesis that the data is normal
+
+# so, are the residuals normal for our linear model?
+# if not, using the math-derived confint function is not appropriate
+# / we would expect math-derived confint to not estimate the population parameter
+shapiro.test(data_with_residuals$.resid)
 
 ```
 
