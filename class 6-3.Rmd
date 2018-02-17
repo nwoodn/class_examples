@@ -37,137 +37,6 @@ library(mosaicModel) # newer version of statisticalModeling with better function
 ads_sales <- as_tibble(read.csv("Advertising.csv"))
 
 ```
-# Monte carlo simulation example
-
-Simulating the time I will get to school. See slides 6.3 (Weds Week 6) for more on monte carlo.
-
-```{r}
-commute_monte_carlo <- function(){
-  wakeup <- 700 + rnorm(1, 10, 2)
-  breakfast <- 10 + runif(1, -5, 5 )
-  commute <- 20 + runif(1, 0, 10 )
-  time_to_get_to_school <- wakeup + breakfast + commute
-  
-  #time_to_get_to_school <-  ...
-  return(time_to_get_to_school)
-}
-
-simulate_1000_times <- do(1000)*commute_monte_carlo()
-hist(simulate_1000_times$commute_monte_carlo)
-
-```
-# Monte carlo simulation: Profit from buying ads when ad price might vary
-
-```{r}
-profit_monte_carlo <- function(){
-  # the price of ads fluctuates with the market
-  # we model these price fluctuations with a random value
-  ad_cost <- 9 + runif(1, -2, 10)
-  number_of_ads <- 2
-  expected_sales_per_ad <- 1.04*number_of_ads
-  
-  profit <- expected_sales_per_ad - (ad_cost*number_of_ads)
-  return(profit)
-}
-
-simulate_1000_times <- do(1000)*profit_monte_carlo()
-hist(simulate_1000_times$profit_monte_carlo)
-```
-# Simulating Ads decision
-
-```{r}
-model <- lm ( sales ~ TV * radio + newspaper, data=ads_sales)
-
-# let's simulate a decision
-first_sales_model <- mod_fun(model)
-
-# the function below will return the outcome
-# we'll start by simulating the decision with the outcome as
-# the amount of sales, but we will reframe and simulate profits soon
-
-# ****!
-# this eval(substitute( )) hack to fix issues with argument evaluation
-# with mod_fun only works one call level deep, unfortunately
-simulate_decision <- function(choice_TV, choice_radio, choice_newspaper)
-{
-  #browser()
- eval(substitute(
-   first_sales_model(TV=choice_TV, 
-                    radio=choice_radio, 
-                    newspaper=choice_newspaper)))
-}
-
-x<-simulate_decision(10,20,40)
-
-# optim expects a single number so we need to get that out of the 
-# tibble in the model_output column.
-# We write simple wrapper function to convert to the interface optim wants
-# note: I think this doesn't work b/c
-#   substitute only looks one level up
-#   e.g. https://github.com/hadley/lazyeval/blob/master/vignettes/lazyeval.Rmd
-#   "substitute() only looks one level up, so you lose the original label if the function isn't called directly:"
-
-sales_wrapper <- function(par){
-  
-  tv <- par[1]
-  radio <- par[2]
-  newsp <- par[3]
-  if(tv+radio+newsp > 500 || tv+radio+newsp < 0)#budget
-  {
-    return(-1)
-  } else {
-   s <- eval(substitute(
-   first_sales_model(TV=tv, 
-                    radio=radio, 
-                    newspaper=newsp)))
- 
-   s$model_output
-   }
-}
-
-
-
-
-# optimize the choice - find the value of choice that gives highest function value
-# ie find choice such that f(choice) is highest, for some values of choice
-# ie 
-optim(par=c(5,5,5), sales_wrapper, gr=NULL, method="L-BFGS-B",
-      control = list(fnscale = -1))
-
-
-# the price of ads fluctuates with the market
-# we model these price fluctuations as a random variable
-
-
-# change to make revenue_per_sale vary
-
-
-# plot by revenue_per_sale
-
-
-```
-
-```{r}
-fr <- function(x) {   ## Rosenbrock Banana function
-    x1 <- x[1]
-    x2 <- x[2]
-    100 * (x2 - x1 * x1)^2 + (1 - x1)^2
-}
-
-y <- optim(par=c(0,0), fr, gr=NULL, method="L-BFGS-B",
-      lower=rep(0, 3), upper=rep(200,3))
-y
-
-line <- function(x) {   ## Rosenbrock Banana function
-    x1 <- x[1]
-    x2 <- x[2]
-    100 * x2 + x1
-}
-
-y <- optim(par=c(50,50), line, gr=NULL, method="L-BFGS-B",
-      lower=rep(0, 3), upper=rep(200,3), control = list(fnscale = -1))
-y
-```
 
 ## Resample function
 
@@ -225,15 +94,20 @@ approx_sampling_distribution_for_TV_effect
 ```
 # mod_ensemble - makes <nreps> of models for you
 
+mod_ensemble uses bootstrapped resample of the data for each model
 ```{r}
 model <- lm ( sales ~ TV + radio + newspaper, data=ads_sales)
+
+#using resample1 and resample2 above, that's what mod_ensemble does
+# here's roughly equivalent code
 sales_mod_ensemble <- mod_ensemble(model, nreps = 2) 
 approx_sampling_distribution_w_mod_ensemble <- 
   mod_effect(sales_mod_ensemble, ~ TV)
 
+# now let's do an acutal full bootstrapping example
+# we're going to try to get sampling distribution for effect size of TV
 
-
-sales_mod_ensemble <- mod_ensemble(model, nreps = 10000) 
+sales_mod_ensemble <- mod_ensemble(model, nreps = 1000) #you should use 15k in practice
 approx_sampling_distribution <- 
   mod_effect(sales_mod_ensemble, ~ TV)
 
@@ -241,36 +115,22 @@ approx_sampling_distribution
 hist(approx_sampling_distribution$slope)
 
 
-# BEGIN buggy
-# for some reason this is buggy, probably the library isn't mature
-
-# this syntax is preffered b/c it highlights that what you computed
-# might vary with different variables (the ~ TV)
-
-# helper function that computes the coverage interval / confidence interval at the desired level
-
-# cover95 <- coverage(0.95)
-
-# get confidence interval
-# the strange syntax is to let you see interaction effects
-#
-#approx_sampling_distribution %>%
-#  df_stats(~ TV, cover95)
-
-# END buggy
-
 # you can use empirical quantiles
-# for a 1-alpha confidence interval (here alpha = .05)
+# ie just find the range of the data falls within
+# a 100%-alpha confidence interval (here alpha = .05)
 # you do 
+
+quantile(approx_sampling_distribution$slope, probs = c(.025, .975))
+
+# here's a function to get confidence interval, as a function of alpha
 confidence_interval_for <- function(actual_column, alpha){
   lower <- alpha/2
   upper <- 1 - (alpha/2)
   quantile(actual_column, probs = c(lower, upper))
 }
 
-#these give same result
-quantile(approx_sampling_distribution$slope, probs = c(.025, .975))
-
+# this gives same as 
+# quantile(approx_sampling_distribution$slope, probs = c(.025, .975))
 confidence_interval_for(approx_sampling_distribution$slope, .05)
 
 # you can also use parametric formulas
@@ -278,16 +138,27 @@ lower_ci =  mean (approx_sampling_distribution$slope) - 1.96*sd(approx_sampling_
 upper_ci =  mean (approx_sampling_distribution$slope) + 1.96*sd(approx_sampling_distribution$slope)
 
 
-#compare to the theoretical CI
+#compare to the theoretical CI (from confint)
 confint(model, "TV")
 confidence_interval_for(approx_sampling_distribution$slope, .05)
 c(lower_ci, upper_ci )
 
+ci <- confidence_interval_for(approx_sampling_distribution$slope, .05)
+
+ggplot(approx_sampling_distribution, aes(slope)) +
+  geom_histogram() + 
+  geom_vline(xintercept = ci[1], color="red" ) + # lower CI value
+  geom_vline(xintercept = ci[2], color="red" ) # upper CI value
+  
 # the linear model's assumptions don't hold for this model
 # b/c if you look at the residuals, you see they don't look
-# gaussian distributed (you can also test the residuals for normality)
-# with this test
+# gaussian distributed.
+
 data_with_residuals <- augment(model, ads_sales)
+#go ahead and add a plot for the residuals here
+
+# You can also test the residuals for normality
+# with this test
 shapiro.test(data_with_residuals$.resid)
 
 #how to tell what the p-value means for the shapiro wilkes test above
@@ -308,38 +179,42 @@ shapiro.test(data_with_residuals$.resid)
 
 ```
 
+# Monte carlo simulation example
 
-# Bootstrapping with 15k resamples
-
-```{r}
-set.seed(42) #reproducibility - the answer to everything
-
-# bootstrapping with 15,000 resamples
-sales_mod_ensemble <- mod_ensemble(model, nreps = 15000) 
-approx_sampling_distribution <- 
-  mod_effect(sales_mod_ensemble, ~ TV)
-
-tidy(summary(model))
-#pro-tip: keep this separate or load an R data file to save yourself time
-#alternative: built-in coffee breaks for your scripts
-
-```
-# Let's visualize the approx. sampling distribution for effect size
+Simulating the time I will get to school. See slides 6.3 (Weds Week 6) for more on monte carlo.
 
 ```{r}
-hist(approx_sampling_distribution$slope)
+commute_monte_carlo <- function(){
+  wakeup <- 700 + rnorm(1, 10, 2)
+  breakfast <- 10 + runif(1, -5, 5 )
+  commute <- 20 + runif(1, 0, 10 )
+  time_to_get_to_school <- wakeup + breakfast + commute
+  
+  #time_to_get_to_school <-  ...
+  return(time_to_get_to_school)
+}
+
+simulate_1000_times <- do(1000)*commute_monte_carlo()
+hist(simulate_1000_times$commute_monte_carlo)
+
 ```
-# Let's simulate some random linear data
+# Monte carlo simulation: Profit from buying ads when ad price might vary
 
 ```{r}
-actual_slope <- .6
-actual_intercept <- 10
+profit_monte_carlo <- function(){
+  # the price of ads fluctuates with the market
+  # we model these price fluctuations with a random value
+  ad_cost <- 9 + runif(1, -2, 10)
+  number_of_ads <- 2
+  expected_sales_per_ad <- 1.04*number_of_ads
+  
+  profit <- expected_sales_per_ad - (ad_cost*number_of_ads)
+  return(profit)
+}
 
-runif(3, 0, 1)
-rnorm(3)
-rnorm(3, 0, 1)
-# for (nrep in 1:10000 )
-random_dataset <-actual_intercept + actual_slope * runif(100, 0, 20)
-
-hist(approx_sampling_distribution$slope)
+simulate_1000_times <- do(1000)*profit_monte_carlo()
+hist(simulate_1000_times$profit_monte_carlo)
 ```
+
+
+
