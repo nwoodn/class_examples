@@ -1,0 +1,121 @@
+---
+title: "Logistic Regression"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+filmData = read.table("filmData.txt",header=T)
+#install.packages("arm")
+library(arm)
+library(statisticalModeling)
+library(mosaicModel)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+require(broom)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+
+# Do scatterplot matrix of data (see lab 6-1 if need help)
+
+# Next fit a logistic regression model on the BoxOffice variable
+# This asks whether or not the chances of winning an Oscar are 
+# related to the the amount of money the film makes.
+boxOfficeModel <- glm ( Oscar ~ BoxOffice, data=filmData, family=binomial(link="logit"))
+
+# use mod_plot on the model
+# look how it nicely does all the logit converting for us
+# and plots the probability
+mod_plot(boxOfficeModel, data=filmData)
+
+```
+```{r}
+# Now fit the full model, i.e., predicting a film's Oscar 
+# winning chances based on all five of the available 
+# predictor variables.
+fullModel = glm( Oscar ~ BoxOffice + Budget + Country + Critics + Length, data = filmData, family=binomial(link="logit"))
+summary(fullModel)
+
+exp(fullModel$coefficients)
+
+mod_plot(fullModel)
+
+
+# Here's another dataset with a logistic model
+mod2 <- glm(married ~ age + sex * sector,
+data = mosaicData::CPS85, family=binomial(link="logit"))
+
+# plot the model and interpret it, what do the visualizations
+# say about the relationships
+
+```
+
+```{r}
+
+# How do we go from a prediction of the probability, to 
+# actually making a prediction of oscar or not?
+
+# To assess the success of our model, let's look at how well
+# it predicts Oscar success.  First we pull the predicted logit
+# scores out of our favoured model.
+oscarLogits = predict(fullModel)
+
+# Now we can use R's handy ifelse command to set a new variable
+# "oscarPredictions" to 1 if the logit score is greater than 0,
+# and to 0 if the logit score is lower than 0.  Recall that a 
+# logit score of 0 corresponds to a probability of 0.5.
+oscarPredictions = ifelse(oscarLogits > 0,1,0)
+
+# Making a table of actual v. predicted Oscar success shows us
+# that our model gets 215 films right and 85 films wrong.
+# Better than guessing though!
+table(oscarPredictions,Oscar)
+
+# Try different cutoffs for the logit score, search over them
+# to find one with better performance 
+
+```
+# Residuals for logistic regression
+
+```{r}
+
+# add logistic regression predictions to data
+fit <- fullModel
+data_fitted <- augment(fit, filmData)
+
+# make residuals plot
+binnedplot(data_fitted$.fitted ,data_fitted$.resid,
+    xlab="Expected Values", ylab="Average residual", 
+    main="Binned residual plot", 
+    cex.pts=0.8, col.pts=1, col.int="gray")
+mod_plot(fit)
+
+
+```
+# What do residuals look like when model assumptions are met?
+
+```{r}
+#generate data using logistic regression model
+
+# read off the coefficient values from the oscars model
+
+# make grid of variable values
+
+# generate data
+
+
+# plot data
+
+
+# generate data with residual
+
+# plot data
+
+```
